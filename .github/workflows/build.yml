@@ -1,0 +1,33 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: MSVC (x64)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Compile
+        shell: cmd
+        run: |
+          cl /nologo /std:c++latest /EHsc /permissive- /utf-8 /O2 /W3 /DUNICODE /D_UNICODE xm5_head_tracker.cpp /Fe:xm5-headtracker.exe
+          if errorlevel 1 exit /b 1
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: xm5-headtracker
+          path: xm5-headtracker.exe
+          if-no-files-found: error
