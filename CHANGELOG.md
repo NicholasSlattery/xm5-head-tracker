@@ -6,6 +6,10 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- Compatibility: **Sony ULT WEAR (WH-ULT900N)** confirmed working (community);
+  promoted from Candidate to Confirmed in the README compatibility table.
+
 ## [1.4.0] - 2026-07-03
 
 ### Fixed

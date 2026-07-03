@@ -118,6 +118,7 @@ below will be updated.
 | Sony WH-1000XM5 | maintainer, tested |
 | Sony WH-1000XM6 | community confirmed |
 | Sony WF-1000XM6 | community confirmed |
+| Sony ULT WEAR (WH-ULT900N) | community confirmed |
 
 ### Candidate
 
@@ -128,7 +129,6 @@ already validated.
 - Sony WF-1000XM5
 - Sony LinkBuds Open (WF-L910)
 - Sony LinkBuds Fit (WF-LS910N)
-- Sony ULT WEAR (WH-ULT900N)
 - Sony LinkBuds (WF-L900)
 - Sony LinkBuds S (WF-LS900N)
 
