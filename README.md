@@ -152,27 +152,27 @@ day expose a compatible protocol, but that is unverified and out of scope for no
 
 ### Why AirPods can't work (yet)
 
-AirPods absolutely have the motion sensors, but Apple does not implement the
-Android Head Tracker HID protocol. Head tracking (and ANC control, ear detection,
-and so on) travels over **Apple's proprietary accessory protocol (AAP)** on a raw
-Bluetooth Classic L2CAP channel (PSM `0x1001`). Two hard blockers follow:
+AirPods have the motion sensors, but Apple does not implement the Android Head
+Tracker HID protocol. Head tracking (and ANC control, ear detection, and so on)
+travels over **Apple's proprietary accessory protocol (AAP)** on a raw Bluetooth
+Classic L2CAP channel (PSM `0x1001`). On Windows that leaves one hard blocker:
 
-1. **Windows has no user-mode API for that channel.** Desktop Windows exposes
-   RFCOMM sockets to applications, but custom Bluetooth Classic L2CAP channels can
-   only be opened by a **kernel-mode profile driver**
-   ([Microsoft's docs](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/creating-a-l2cap-client-connection-to-a-remote-device)).
-   That is how [MagicPods](https://magicpods.app/magicaap/) does it on Windows: it
-   ships a custom driver. This project's hard rule is that it **never installs a
-   custom kernel driver**, so that path is out of scope here.
-2. **The head-tracking payload is not publicly documented.** The
-   [LibrePods](https://github.com/kavishdevar/librepods) project has
-   reverse-engineered much of AAP, but head-orientation packets remain unexplored
-   territory even there.
+**Windows has no user-mode API for that channel.** Desktop Windows exposes
+RFCOMM sockets to applications, but custom Bluetooth Classic L2CAP channels can
+only be opened by a **kernel-mode profile driver**
+([Microsoft's docs](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/creating-a-l2cap-client-connection-to-a-remote-device)).
+That is how [MagicPods](https://magicpods.app/magicaap/) does it on Windows: it
+ships a custom driver. This project's hard rule is that it **never installs a
+custom kernel driver**, so that path is out of scope here.
+
+The payload itself is not unknown. The AAP head-orientation packets are
+covered by [pabloaul's `rtbuddy` Wireshark dissector](https://github.com/pabloaul/apple-wireshark/tree/main/plugins/rtbuddy),
+linked from the [LibrePods](https://github.com/librepods-org/librepods) README,
+so the only thing standing in the way on Windows is the L2CAP access.
 
 What this bridge does instead: it **recognises paired AirPods** and tells you
 exactly this, in `probe`, in `bridge`, and in the GUI, instead of failing
-silently. If Windows ever exposes user-mode L2CAP, or a maintained open AAP bridge
-appears, an AirPods backend becomes feasible and contributions are welcome.
+silently.
 
 ## Where the data goes (ports)
 
