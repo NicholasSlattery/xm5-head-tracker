@@ -25,8 +25,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   build, tests, and release jobs.
 
 ### Changed
-- The macOS App now recycles a stalled IOHID session and escalates paired-headset
-  recovery when no valid sample arrives after a power cycle.
+- The macOS App now handles a stalled sample stream with a separate short
+  backoff, one SDP refresh, and IOHID/silent-audio recycling without deliberately
+  disconnecting the headset's Bluetooth baseband connection.
 - macOS reconnect backoff now wakes as soon as the exact paired headset reconnects
   or its Android Head Tracker IOHID collection becomes visible.
 - The macOS build/run script now uses a unique local Apple Development identity,

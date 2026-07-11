@@ -62,16 +62,20 @@ inline unsigned reconnectBackoffSeconds(std::size_t attempt) {
 
 enum class StreamRecoveryAction {
     refreshServices,
-    forceBasebandReconnect,
     reopenHid,
 };
 
-// Escalate a stalled, configured stream only once per step. Continued stalls
-// recycle IOHID with bounded backoff instead of repeatedly dropping Bluetooth.
+// A stalled configured stream may need one SDP refresh, but it must not drop
+// the headset's Bluetooth baseband connection. Continued stalls recycle only
+// the IOHID and silent-audio sessions.
 inline StreamRecoveryAction streamRecoveryAction(std::size_t consecutiveTimeouts) {
     if (consecutiveTimeouts <= 1) return StreamRecoveryAction::refreshServices;
-    if (consecutiveTimeouts == 2) return StreamRecoveryAction::forceBasebandReconnect;
     return StreamRecoveryAction::reopenHid;
+}
+
+inline unsigned streamReconnectBackoffSeconds(std::size_t attempt) {
+    constexpr std::array<unsigned, 2> delays{1, 2};
+    return delays[std::min(attempt, delays.size() - 1)];
 }
 
 inline bool trackerAvailabilityBecameReady(

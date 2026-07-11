@@ -264,7 +264,8 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
         }
         std::wstring trackedAddress = sony::loadLastVerifiedBluetoothAddress();
         std::wstring trackedProduct;
-        std::size_t backoffIndex{};
+        std::size_t availabilityBackoffIndex{};
+        std::size_t streamBackoffIndex{};
         unsigned bluetoothRecoveryStage{};
         std::size_t consecutiveStreamTimeouts{};
         bool streamRecoveryPending{};
@@ -280,16 +281,12 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
                 const auto action = sony::streamRecoveryAction(consecutiveStreamTimeouts);
                 if (action != sony::StreamRecoveryAction::reopenHid &&
                     (!trackedAddress.empty() || !trackedProduct.empty())) {
-                    const bool forceBasebandReconnect =
-                        action == sony::StreamRecoveryAction::forceBasebandReconnect;
                     notifyStatus(
                         handle,
                         SHT_STATUS_RECONNECTING,
-                        forceBasebandReconnect
-                            ? "No samples after IOHID recycle; reconnecting the paired headset and refreshing HID services"
-                            : "Recycling IOHID and refreshing the paired headset HID services");
+                        "Recycling IOHID and refreshing the paired headset HID services");
                     sony::recoverPairedBluetoothHid(
-                        trackedAddress, trackedProduct, forceBasebandReconnect);
+                        trackedAddress, trackedProduct, false);
                     devices = handle.hid.enumerate();
                     {
                         std::lock_guard lock(handle.diagnosticsMutex);
@@ -341,8 +338,9 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
                     std::lock_guard lock(handle.diagnosticsMutex);
                     ++handle.reconnectAttempts;
                 }
-                const auto delay = sony::reconnectBackoffSeconds(backoffIndex);
-                if (backoffIndex < 4) ++backoffIndex;
+                const auto delay = sony::reconnectBackoffSeconds(
+                    availabilityBackoffIndex);
+                if (availabilityBackoffIndex < 4) ++availabilityBackoffIndex;
                 const auto waitResult = waitForReconnect(
                     stop, std::chrono::seconds(delay), trackedAddress,
                     trackedProduct, !unverified);
@@ -391,7 +389,8 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
                         healthyStream = true;
                         consecutiveStreamTimeouts = 0;
                         bluetoothRecoveryStage = 0;
-                        backoffIndex = 0;
+                        availabilityBackoffIndex = 0;
+                        streamBackoffIndex = 0;
                     }
                     if (!firstSampleReported.load() &&
                         std::chrono::steady_clock::now() - configuredAt >= 5s) {
@@ -424,19 +423,26 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
                     std::lock_guard lock(handle.diagnosticsMutex);
                     ++handle.reconnectAttempts;
                 }
-                const auto delay = sony::reconnectBackoffSeconds(backoffIndex);
-                if (backoffIndex < 4) ++backoffIndex;
+                const bool stalledStream = streamRecoveryPending;
+                const auto delay = stalledStream
+                    ? sony::streamReconnectBackoffSeconds(streamBackoffIndex)
+                    : sony::reconnectBackoffSeconds(availabilityBackoffIndex);
+                if (stalledStream) {
+                    if (streamBackoffIndex < 1) ++streamBackoffIndex;
+                } else if (availabilityBackoffIndex < 4) {
+                    ++availabilityBackoffIndex;
+                }
                 if (connected) {
                     notifyStatus(
                         handle,
                         SHT_STATUS_RECONNECTING,
-                        streamRecoveryPending
+                        stalledStream
                             ? std::format("Stalled stream closed; retrying in {} second(s)", delay)
                             : std::format("Tracker disconnected; retrying in {} second(s)", delay));
                 }
                 const auto waitResult = waitForReconnect(
                     stop, std::chrono::seconds(delay), trackedAddress,
-                    trackedProduct, connected && !streamRecoveryPending);
+                    trackedProduct, connected && !stalledStream);
                 if (waitResult == ReconnectWaitResult::stopped) break;
                 if (waitResult == ReconnectWaitResult::availabilityChanged) {
                     notifyStatus(handle, SHT_STATUS_RECONNECTING,

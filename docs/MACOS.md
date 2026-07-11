@@ -208,10 +208,11 @@ Some ULT WEAR sessions expose the collection before samples resume. The CLI can
 perform one clean child-process recovery rather than looping indefinitely. The
 SwiftUI engine treats a configured connection with no valid sample for five
 seconds as a stalled stream: it closes the current silent-audio and IOHID
-session, refreshes SDP, and retries with bounded backoff. A second consecutive
-stall performs one paired-device baseband reconnect; later retries reopen IOHID
-without repeatedly dropping Bluetooth. Recovery state is cleared only after a
-valid sample arrives. During the 1, 2, 5, 10, and 30-second reconnect backoff,
+session, refreshes SDP once, and retries after a separate short 1- then 2-second
+backoff. Later stalls recycle only IOHID and silent audio; stream timeout never
+closes the headset's Bluetooth baseband connection. Recovery state is cleared
+only after a valid sample arrives. During the separate 1, 2, 5, 10, and
+30-second device-availability backoff,
 the App checks the exact paired headset and matching IOHID collection every 250
 milliseconds. A Bluetooth reconnect or newly visible tracker collection wakes
 the retry immediately instead of waiting for the remaining backoff interval.
@@ -252,8 +253,9 @@ should be a last diagnostic step rather than a normal startup requirement.
 
 Allow several seconds for the silent A2DP keepalive to activate the audio path.
 The log should report the keepalive and then the first valid sample. If no sample
-arrives, confirm that macOS still lists the headset as the active connected
-Bluetooth device and rerun `probe`.
+arrives, the App restarts the IOHID and silent-audio sessions after a short
+backoff without deliberately disconnecting Bluetooth. Confirm that macOS still
+lists the headset as connected and rerun `probe` if retries continue.
 
 ### OpenTrack or JSON receives nothing
 
