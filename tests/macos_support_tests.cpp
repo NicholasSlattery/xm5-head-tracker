@@ -47,11 +47,16 @@ TEST(macos_reconnect_backoff_is_bounded) {
     CHECK(reconnectBackoffSeconds(1000) == 30);
 }
 
-TEST(macos_stream_recovery_escalates_without_repeated_baseband_reconnects) {
+TEST(macos_stream_recovery_never_forces_a_baseband_reconnect) {
     CHECK(streamRecoveryAction(1) == StreamRecoveryAction::refreshServices);
-    CHECK(streamRecoveryAction(2) == StreamRecoveryAction::forceBasebandReconnect);
-    CHECK(streamRecoveryAction(3) == StreamRecoveryAction::reopenHid);
+    CHECK(streamRecoveryAction(2) == StreamRecoveryAction::reopenHid);
     CHECK(streamRecoveryAction(1000) == StreamRecoveryAction::reopenHid);
+}
+
+TEST(macos_stream_reconnect_backoff_stays_short) {
+    CHECK(streamReconnectBackoffSeconds(0) == 1);
+    CHECK(streamReconnectBackoffSeconds(1) == 2);
+    CHECK(streamReconnectBackoffSeconds(1000) == 2);
 }
 
 TEST(macos_reconnect_wait_wakes_on_bluetooth_or_hid_transition) {
