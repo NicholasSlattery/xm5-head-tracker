@@ -196,12 +196,44 @@ void deliverSample(SHTHandle& handle, sony::MotionSample sample,
     }
 }
 
-bool waitForStop(std::stop_token stop, std::chrono::seconds duration) {
+enum class ReconnectWaitResult {
+    elapsed,
+    availabilityChanged,
+    stopped,
+};
+
+ReconnectWaitResult waitForReconnect(
+    std::stop_token stop,
+    std::chrono::seconds duration,
+    std::wstring_view trackedAddress,
+    std::wstring_view trackedProduct,
+    bool wakeOnCurrentlyVisibleHid) {
     const auto deadline = std::chrono::steady_clock::now() + duration;
-    while (!stop.stop_requested() && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(100ms);
+    auto previous = sony::queryPairedTrackerAvailability(
+        trackedAddress, trackedProduct);
+    if (wakeOnCurrentlyVisibleHid && previous.hidCollectionVisible) {
+        return ReconnectWaitResult::availabilityChanged;
     }
-    return stop.stop_requested();
+    auto nextAvailabilityCheck = std::chrono::steady_clock::now() + 250ms;
+    while (!stop.stop_requested() && std::chrono::steady_clock::now() < deadline) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= nextAvailabilityCheck) {
+            const auto current = sony::queryPairedTrackerAvailability(
+                trackedAddress, trackedProduct);
+            if (sony::trackerAvailabilityBecameReady(
+                    previous.bluetoothConnected,
+                    previous.hidCollectionVisible,
+                    current.bluetoothConnected,
+                    current.hidCollectionVisible)) {
+                return ReconnectWaitResult::availabilityChanged;
+            }
+            previous = current;
+            nextAvailabilityCheck = now + 250ms;
+        }
+        std::this_thread::sleep_for(50ms);
+    }
+    return stop.stop_requested() ? ReconnectWaitResult::stopped
+                                 : ReconnectWaitResult::elapsed;
 }
 
 void runEngine(SHTHandle& handle, std::stop_token stop,
@@ -311,7 +343,14 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
                 }
                 const auto delay = sony::reconnectBackoffSeconds(backoffIndex);
                 if (backoffIndex < 4) ++backoffIndex;
-                if (waitForStop(stop, std::chrono::seconds(delay))) break;
+                const auto waitResult = waitForReconnect(
+                    stop, std::chrono::seconds(delay), trackedAddress,
+                    trackedProduct, !unverified);
+                if (waitResult == ReconnectWaitResult::stopped) break;
+                if (waitResult == ReconnectWaitResult::availabilityChanged) {
+                    notifyStatus(handle, SHT_STATUS_RECONNECTING,
+                                 "Paired headset or IOHID collection became available; retrying now");
+                }
                 continue;
             }
 
@@ -395,7 +434,14 @@ void runEngine(SHTHandle& handle, std::stop_token stop,
                             ? std::format("Stalled stream closed; retrying in {} second(s)", delay)
                             : std::format("Tracker disconnected; retrying in {} second(s)", delay));
                 }
-                if (waitForStop(stop, std::chrono::seconds(delay))) break;
+                const auto waitResult = waitForReconnect(
+                    stop, std::chrono::seconds(delay), trackedAddress,
+                    trackedProduct, connected && !streamRecoveryPending);
+                if (waitResult == ReconnectWaitResult::stopped) break;
+                if (waitResult == ReconnectWaitResult::availabilityChanged) {
+                    notifyStatus(handle, SHT_STATUS_RECONNECTING,
+                                 "Paired headset or IOHID collection became available; retrying now");
+                }
             }
         }
         handle.audioWake.stop();

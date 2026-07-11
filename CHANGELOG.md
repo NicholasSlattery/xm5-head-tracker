@@ -27,6 +27,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 - The macOS App now recycles a stalled IOHID session and escalates paired-headset
   recovery when no valid sample arrives after a power cycle.
+- macOS reconnect backoff now wakes as soon as the exact paired headset reconnects
+  or its Android Head Tracker IOHID collection becomes visible.
 - The macOS build/run script now uses a unique local Apple Development identity,
   when available, so Input Monitoring permission survives local rebuilds.
 - Portable floating-point configuration parsing now uses a classic-locale
