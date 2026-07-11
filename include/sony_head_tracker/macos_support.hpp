@@ -74,4 +74,13 @@ inline StreamRecoveryAction streamRecoveryAction(std::size_t consecutiveTimeouts
     return StreamRecoveryAction::reopenHid;
 }
 
+inline bool trackerAvailabilityBecameReady(
+    bool previousBluetoothConnected,
+    bool previousHidVisible,
+    bool bluetoothConnected,
+    bool hidVisible) {
+    return (!previousBluetoothConnected && bluetoothConnected) ||
+           (!previousHidVisible && hidVisible);
+}
+
 } // namespace sony

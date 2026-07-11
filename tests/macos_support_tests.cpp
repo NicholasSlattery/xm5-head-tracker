@@ -53,3 +53,11 @@ TEST(macos_stream_recovery_escalates_without_repeated_baseband_reconnects) {
     CHECK(streamRecoveryAction(3) == StreamRecoveryAction::reopenHid);
     CHECK(streamRecoveryAction(1000) == StreamRecoveryAction::reopenHid);
 }
+
+TEST(macos_reconnect_wait_wakes_on_bluetooth_or_hid_transition) {
+    CHECK(trackerAvailabilityBecameReady(false, false, true, false));
+    CHECK(trackerAvailabilityBecameReady(false, false, false, true));
+    CHECK(trackerAvailabilityBecameReady(true, false, true, true));
+    CHECK(!trackerAvailabilityBecameReady(true, true, true, true));
+    CHECK(!trackerAvailabilityBecameReady(false, false, false, false));
+}

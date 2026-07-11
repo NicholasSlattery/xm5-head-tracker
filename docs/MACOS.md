@@ -211,7 +211,10 @@ seconds as a stalled stream: it closes the current silent-audio and IOHID
 session, refreshes SDP, and retries with bounded backoff. A second consecutive
 stall performs one paired-device baseband reconnect; later retries reopen IOHID
 without repeatedly dropping Bluetooth. Recovery state is cleared only after a
-valid sample arrives.
+valid sample arrives. During the 1, 2, 5, 10, and 30-second reconnect backoff,
+the App checks the exact paired headset and matching IOHID collection every 250
+milliseconds. A Bluetooth reconnect or newly visible tracker collection wakes
+the retry immediately instead of waiting for the remaining backoff interval.
 
 ## Differences from the original Windows implementation
 

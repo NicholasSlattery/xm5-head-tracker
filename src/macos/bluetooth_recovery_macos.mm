@@ -7,6 +7,7 @@
 #import <IOBluetooth/IOBluetooth.h>
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/hid/IOHIDLib.h>
 
 #include <algorithm>
 #include <chrono>
@@ -76,6 +77,67 @@ IOBluetoothDevice* exactPairedDevice(std::wstring_view address,
         }
     }
     return match;
+}
+
+bool exactHidCollectionVisible(const std::string& address, NSString* fallbackName) {
+    IOHIDManagerRef manager = IOHIDManagerCreate(kCFAllocatorDefault,
+                                                  kIOHIDManagerOptionNone);
+    if (!manager) return false;
+
+    CFMutableDictionaryRef matching = CFDictionaryCreateMutable(
+        kCFAllocatorDefault, 2, &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks);
+    const int usagePage = 0x20;
+    const int usage = 0xE1;
+    CFNumberRef pageNumber = CFNumberCreate(kCFAllocatorDefault,
+                                             kCFNumberIntType, &usagePage);
+    CFNumberRef usageNumber = CFNumberCreate(kCFAllocatorDefault,
+                                              kCFNumberIntType, &usage);
+    CFDictionarySetValue(matching, CFSTR(kIOHIDDeviceUsagePageKey), pageNumber);
+    CFDictionarySetValue(matching, CFSTR(kIOHIDDeviceUsageKey), usageNumber);
+    IOHIDManagerSetDeviceMatching(manager, matching);
+    CFRelease(usageNumber);
+    CFRelease(pageNumber);
+    CFRelease(matching);
+
+    bool visible{};
+    bool ambiguousName{};
+    if (IOHIDManagerOpen(manager, kIOHIDManagerOptionNone) == kIOReturnSuccess) {
+        CFSetRef devices = IOHIDManagerCopyDevices(manager);
+        if (devices) {
+            const auto count = CFSetGetCount(devices);
+            std::vector<const void*> values(static_cast<std::size_t>(count));
+            CFSetGetValues(devices, values.data());
+            for (const auto raw : values) {
+                auto device = static_cast<IOHIDDeviceRef>(const_cast<void*>(raw));
+                if (!IOHIDDeviceConformsTo(device, usagePage, usage)) continue;
+                if (!address.empty()) {
+                    auto serial = (NSString*)IOHIDDeviceGetProperty(
+                        device, CFSTR(kIOHIDSerialNumberKey));
+                    if (normalizedAddress(serial) == address) {
+                        visible = true;
+                        break;
+                    }
+                    continue;
+                }
+                auto product = (NSString*)IOHIDDeviceGetProperty(
+                    device, CFSTR(kIOHIDProductKey));
+                if (!fallbackName || !product ||
+                    [product caseInsensitiveCompare:fallbackName] != NSOrderedSame) {
+                    continue;
+                }
+                if (visible) {
+                    ambiguousName = true;
+                    break;
+                }
+                visible = true;
+            }
+            CFRelease(devices);
+        }
+        IOHIDManagerClose(manager, kIOHIDManagerOptionNone);
+    }
+    CFRelease(manager);
+    return visible && !ambiguousName;
 }
 
 void runLoopFor(std::chrono::milliseconds duration) {
@@ -186,6 +248,24 @@ BluetoothRecoveryResult recoverPairedBluetoothHid(
             }
         }
         runLoopFor(std::chrono::milliseconds(500));
+    }
+    return result;
+}
+
+TrackerAvailability queryPairedTrackerAvailability(
+    std::wstring_view bluetoothAddress,
+    std::wstring_view fallbackProductName) {
+    TrackerAvailability result;
+    @autoreleasepool {
+        IOBluetoothDevice* device = exactPairedDevice(
+            bluetoothAddress, fallbackProductName);
+        if (!device || !device.isPaired) return result;
+        result.pairedDeviceFound = true;
+        result.bluetoothConnected = device.isConnected;
+        const auto address = normalizedAddress(bluetoothAddress);
+        NSString* name = device.name;
+        if (!name) name = stringFromWide(fallbackProductName);
+        result.hidCollectionVisible = exactHidCollectionVisible(address, name);
     }
     return result;
 }

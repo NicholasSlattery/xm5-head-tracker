@@ -21,10 +21,22 @@ struct BluetoothRecoveryResult {
     std::int32_t sdpStartStatus{};
 };
 
+struct TrackerAvailability {
+    bool pairedDeviceFound{};
+    bool bluetoothConnected{};
+    bool hidCollectionVisible{};
+};
+
 BluetoothRecoveryResult recoverPairedBluetoothHid(
     std::wstring_view bluetoothAddress,
     std::wstring_view fallbackProductName,
     bool forceBasebandReconnect);
+
+// Read-only availability check for the exact previously verified paired
+// headset. Used to wake reconnect backoff without changing Bluetooth state.
+TrackerAvailability queryPairedTrackerAvailability(
+    std::wstring_view bluetoothAddress,
+    std::wstring_view fallbackProductName);
 
 std::wstring loadLastVerifiedBluetoothAddress();
 bool saveLastVerifiedBluetoothAddress(std::wstring_view bluetoothAddress);
