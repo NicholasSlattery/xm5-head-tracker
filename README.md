@@ -84,11 +84,26 @@ It discovers devices by the Android Head Tracker HID descriptor instead of by
 model name, VID/PID, report ID, or report length.
 
 Choose **one** of the following ways to run Sony Head Tracker. You do not need
-to build or run both. Both options require full Xcode selected with
-`xcode-select`; the command-line option additionally requires CMake 3.25 or
-later.
+to build or run more than one. Downloading the prebuilt package requires no
+developer tools; building from source (Options 2 and 3) requires full Xcode
+selected with `xcode-select`, and the command-line option additionally requires
+CMake 3.25 or later.
 
-#### Option 1 — Native macOS application (recommended)
+#### Option 1 — Download the prebuilt package (no Xcode required)
+
+1. Download `sony-head-tracker-vX.Y.Z-macos-universal.zip` from the
+   [latest release](https://github.com/NicholasSlattery/sony-head-tracker/releases/latest).
+   It contains the SwiftUI app and the CLI bridge as universal (Apple Silicon +
+   Intel) binaries for macOS 14 or later.
+2. Unzip it and move `SonyHeadTracker.app` wherever you like.
+3. The app is ad-hoc signed but not notarized, so Gatekeeper flags the first
+   launch: right-click (Control-click) the app and choose **Open**. If macOS
+   does not offer **Open**, go to **System Settings > Privacy & Security**,
+   scroll to the blocked-app notice, and click **Open Anyway**.
+4. Allow Sony Head Tracker under **System Settings > Privacy & Security >
+   Input Monitoring**, then quit and reopen it.
+
+#### Option 2 — Build the native macOS application
 
 The application does not require a separate CMake build. From the repository
 root, run:
@@ -102,7 +117,7 @@ It does not inspect or use signing identities unless you explicitly opt in with
 `SHT_ENABLE_STABLE_SIGNING=1`; see the macOS guide for the Input Monitoring
 continuity workflow.
 
-#### Option 2 — Command-line bridge
+#### Option 3 — Command-line bridge
 
 Use this option when you want a Terminal-only bridge without the SwiftUI
 application:
@@ -525,6 +540,12 @@ There is no paid version required. Donations are optional and help keep the proj
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for build, style,
 and PR guidance, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community
 expectations. Notable changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
+## Acknowledgements
+
+Huge thanks to [Hank0101Chen](https://github.com/Hank0101Chen) for contributing
+the native macOS support — the IOHID backend, the SwiftUI application, the
+command-line bridge, and the macOS hardware validation.
 
 ## License
 

@@ -52,7 +52,7 @@ targets:
           - "$(PROJECT_DIR)/../include"
           - "$(PROJECT_DIR)/Bridge"
         SWIFT_OBJC_BRIDGING_HEADER: "$(PROJECT_DIR)/Bridge/SonyHeadTracker-Bridging-Header.h"
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "2.2.0"
         CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic
       configs:

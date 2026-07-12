@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main, macos-support]
+    branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -57,6 +57,64 @@ jobs:
       - name: Run sanitizer tests
         run: ctest --test-dir build/macos-sanitizers --output-on-failure
 
+  macos-package:
+    name: Package macOS app + CLI
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Configure (universal Release)
+        run: >-
+          cmake -S . -B build/macos-dist -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build macOS CLI
+        run: cmake --build build/macos-dist --target sony-head-tracker-macos --parallel
+
+      - name: Verify the tag matches the CLI version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          cli_version="$(./build/macos-dist/sony-head-tracker-macos version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          echo "tag=$tag_version  cli=$cli_version"
+          if [ "$tag_version" != "$cli_version" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match CLI version $cli_version. Bump include/sony_head_tracker/version.h."
+            exit 1
+          fi
+
+      - name: Build macOS app (Release, unsigned)
+        run: >-
+          xcodebuild -project macos/SonyHeadTracker.xcodeproj
+          -scheme SonyHeadTracker -configuration Release
+          -derivedDataPath build/DerivedData-dist
+          ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO
+          CODE_SIGNING_ALLOWED=NO build
+
+      - name: Ad-hoc sign the app
+        run: codesign --force --deep --sign - build/DerivedData-dist/Build/Products/Release/SonyHeadTracker.app
+
+      - name: Assemble macOS package
+        run: |
+          version="$(./build/macos-dist/sony-head-tracker-macos version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+          stage="sony-head-tracker-v${version}-macos-universal"
+          mkdir -p "$stage/docs"
+          ditto build/DerivedData-dist/Build/Products/Release/SonyHeadTracker.app "$stage/SonyHeadTracker.app"
+          cp build/macos-dist/sony-head-tracker-macos "$stage/"
+          cp README.md LICENSE CHANGELOG.md extras/opentrack-sony-head-tracker.ini "$stage/"
+          cp docs/MACOS.md docs/PROTOCOL.md "$stage/docs/"
+          # ditto preserves the .app bundle structure, symlinks, and permissions.
+          ditto -c -k --keepParent "$stage" "$stage.zip"
+          shasum -a 256 "$stage.zip"
+
+      - name: Upload macOS package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sony-head-tracker-macos
+          path: sony-head-tracker-v*-macos-universal.zip
+          if-no-files-found: error
+
   build:
     name: Build & test (MSVC x64)
     runs-on: windows-latest
@@ -91,7 +149,7 @@ jobs:
 
   release:
     name: Release
-    needs: build
+    needs: [build, macos-core, macos-sanitizers, macos-package]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     permissions:
@@ -106,6 +164,12 @@ jobs:
         with:
           name: sony-head-tracker
           path: dist-bin
+
+      - name: Download macOS package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sony-head-tracker-macos
+          path: dist-macos
 
       - name: Verify the tag matches the executable version
         shell: pwsh
@@ -130,30 +194,40 @@ jobs:
           Copy-Item README.md, LICENSE, CHANGELOG.md, docs\PROTOCOL.md, extras\opentrack-sony-head-tracker.ini $stage\
           $zip = "$stage.zip"
           Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          $macZipItem = Get-ChildItem dist-macos\sony-head-tracker-v*-macos-universal.zip | Select-Object -First 1
+          if (-not $macZipItem) { Write-Error "macOS package zip not found in dist-macos"; exit 1 }
+          Move-Item $macZipItem.FullName .
+          $macZip = $macZipItem.Name
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          $macHash = (Get-FileHash $macZip -Algorithm SHA256).Hash.ToLower()
           # Write LF (not CRLF) so `sha256sum -c` works cross-platform.
-          [System.IO.File]::WriteAllText((Join-Path $PWD 'SHA256SUMS.txt'), "$hash  $zip`n")
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'SHA256SUMS.txt'), "$hash  $zip`n$macHash  $macZip`n")
           Get-Content SHA256SUMS.txt
           "ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "MACZIP=$macZip" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
         with:
-          subject-path: ${{ env.ZIP }}
+          subject-path: |
+            ${{ env.ZIP }}
+            ${{ env.MACZIP }}
 
       - name: Publish release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             ${{ env.ZIP }}
+            ${{ env.MACZIP }}
             SHA256SUMS.txt
           fail_on_unmatched_files: true
           generate_release_notes: true
           body: |
-            Windows x64 build of Sony Head Tracker (unofficial).
+            Windows x64 and macOS builds of Sony Head Tracker (unofficial).
 
-            **Package** `${{ env.ZIP }}` — executable, README, LICENSE, `PROTOCOL.md`, and a sample OpenTrack profile.
-            **Verify** the download against `SHA256SUMS.txt`. The archive carries a signed build-provenance attestation:
-            `gh attestation verify ${{ env.ZIP }} --repo ${{ github.repository }}`
+            **Windows package** `${{ env.ZIP }}` — executable, README, LICENSE, `PROTOCOL.md`, and a sample OpenTrack profile.
+            **macOS package** `${{ env.MACZIP }}` — universal (Apple Silicon + Intel) SwiftUI app and command-line bridge for macOS 14+, with docs. The app is ad-hoc signed and not notarized: right-click it and choose **Open** on first launch, or allow it under **System Settings > Privacy & Security**. Setup and permissions are covered in the bundled `docs/MACOS.md`.
+            **Verify** downloads against `SHA256SUMS.txt`. Both archives carry signed build-provenance attestations:
+            `gh attestation verify <zip> --repo ${{ github.repository }}`
 
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md) for behaviour changes. Auto-generated commit notes follow.

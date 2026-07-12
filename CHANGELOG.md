@@ -6,6 +6,14 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-07-11
+
+macOS release. Sony Head Tracker now runs natively on macOS 14 or later, with
+the same tracking engine, filtering behaviour, and loopback UDP wire formats as
+the Windows application. The Windows build is unchanged in behaviour. Huge
+thanks to [Hank0101Chen](https://github.com/Hank0101Chen) for contributing the
+macOS support.
+
 ### Added
 - Native macOS 14+ support with a descriptor-driven IOHID backend, POSIX
   loopback UDP output, a command-line bridge, and a SwiftUI application.
@@ -23,6 +31,9 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the tested ULT WEAR and remains active only for the tracking session.
 - macOS core/C API tests in GitHub Actions while retaining the existing Windows
   build, tests, and release jobs.
+- Tagged releases now also publish a macOS package (universal SwiftUI app and
+  CLI, ad-hoc signed) alongside the Windows zip, with SHA-256 checksums and
+  build-provenance attestations for both.
 
 ### Changed
 - The macOS App now handles a stalled sample stream with a separate short
@@ -332,7 +343,8 @@ equivalence checks was added to prove and guard this.
   filtering with recenter and drift correction, OpenTrack + JSON UDP output,
   diagnostics GUI, and one-click driver-only "Repair Tracker" recovery.
 
-[Unreleased]: https://github.com/NicholasSlattery/sony-head-tracker/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/NicholasSlattery/sony-head-tracker/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/NicholasSlattery/sony-head-tracker/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/NicholasSlattery/sony-head-tracker/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/NicholasSlattery/sony-head-tracker/compare/v1.4.0...v2.0.0
 [1.4.0]: https://github.com/NicholasSlattery/sony-head-tracker/compare/v1.3.0...v1.4.0

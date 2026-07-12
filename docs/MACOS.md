@@ -36,7 +36,35 @@ protocol compatibility:
 Other models can be checked without changing the source code by running
 `probe`. A verified collection is the compatibility requirement.
 
-## Requirements
+## Download a prebuilt release
+
+Each tagged release includes `sony-head-tracker-vX.Y.Z-macos-universal.zip`
+with the SwiftUI app, the CLI bridge, and documentation. The binaries are
+universal (Apple Silicon and Intel) and require macOS 14 or later. Xcode and
+CMake are **not** required to use a downloaded release.
+
+The app and CLI are ad-hoc signed but not notarized, so Gatekeeper flags the
+first launch:
+
+1. Unzip the archive and move `SonyHeadTracker.app` wherever you like, for
+   example `/Applications`.
+2. Right-click (Control-click) the app and choose **Open**, then confirm. If
+   macOS does not offer **Open**, go to **System Settings > Privacy &
+   Security**, scroll to the blocked-app notice, and click **Open Anyway**.
+   Alternatively, clear the quarantine attribute from Terminal:
+   `xattr -dr com.apple.quarantine SonyHeadTracker.app`
+3. Grant Input Monitoring permission as described under
+   [Permissions](#permissions).
+
+The bundled CLI runs directly from Terminal, for example
+`./sony-head-tracker-macos probe`; the same one-time Gatekeeper approval (or
+`xattr -d com.apple.quarantine sony-head-tracker-macos`) applies.
+
+Verify a download against the release's `SHA256SUMS.txt`, and its
+build-provenance attestation with
+`gh attestation verify <zip> --repo NicholasSlattery/sony-head-tracker`.
+
+## Requirements (building from source)
 
 - macOS 14 or later;
 - full Xcode selected with `xcode-select`;
